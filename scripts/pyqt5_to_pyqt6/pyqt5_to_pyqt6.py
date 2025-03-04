@@ -45,15 +45,19 @@ import glob
 import inspect
 import os
 import sys
+import logging
+import re
 
 from collections import defaultdict
 from collections.abc import Sequence
 from enum import Enum
 
+logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+
 try:
     import PyQt5
 
-    print("WARNING: PyQt5 has been found. It may result in wrong behavior.\n")
+    logging.warning("WARNING: PyQt5 has been found. It may result in wrong behavior.\n")
 except ImportError:
     pass
 
@@ -82,6 +86,7 @@ from PyQt6.QtWidgets import *  # noqa: F403
 from PyQt6.QtXml import *  # noqa: F403
 from tokenize_rt import Offset, Token, reversed_enumerate, src_to_tokens, tokens_to_src
 
+
 try:
     import qgis._3d as qgis_3d  # noqa: F403
     import qgis.analysis as qgis_analysis  # noqa: F403
@@ -97,7 +102,7 @@ except ImportError:
     qgis_gui = None
     qgis_analysis = None
     qgis_3d = None
-    print(
+    logging.warning(
         "QGIS classes not available for introspection, only a partial upgrade will be performed"
     )
 
@@ -184,7 +189,7 @@ rename_function_attributes = {"exec_": "exec"}
 rename_function_definitions = {"exec_": "exec"}
 
 import_warnings = {
-    "QRegExp": "QRegExp is removed in Qt6, please use QRegularExpression for Qt5/Qt6 compatibility"
+    "QRegExp is removed in Qt6, please use QRegularExpression for Qt5/Qt6 compatibility"
 }
 
 # { (class, enum_value) : enum_name }
@@ -192,7 +197,25 @@ qt_enums = {}
 ambiguous_enums = defaultdict(set)
 
 
-def fix_file(filename: str, qgis3_compat: bool) -> int:
+def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
+    """_summary_
+
+    Parameters
+    ----------
+    filename : str
+        Name of file to check
+    qgis3_compat : bool
+        Apply modifications that would break behavior on QGIS 3, hence code may not work on QGIS 3
+    dry_run : bool, optional
+        Reports only errors and does not modify files, by default False
+
+    Returns
+    -------
+    int
+        Return 0 if no file is modified.
+    """
+
+    file_basename = os.path.basename(filename)
 
     with open(filename, encoding="UTF-8") as f:
         contents = f.read()
@@ -411,7 +434,7 @@ def fix_file(filename: str, qgis3_compat: bool) -> int:
         imported_modules.add(node.module)
         for name in node.names:
             if name.name in import_warnings:
-                print(f"{filename}: {import_warnings[name.name]}")
+                logging.warning(f"{file_basename}: {import_warnings[name.name]}")
             if name.name == "resources_rc":
                 sys.stderr.write(
                     f"{filename}:{_node.lineno}:{_node.col_offset} WARNING: support for compiled resources "
@@ -516,7 +539,83 @@ def fix_file(filename: str, qgis3_compat: bool) -> int:
         if module not in imported_modules:
             class_import = ", ".join(classes)
             import_statement = f"from {module} import {class_import}"
-            print(f"{filename}: Missing import, manually add \n\t{import_statement}")
+            logging.warning(
+                f"{file_basename}: Missing import, manually add {import_statement}"
+            )
+
+    if dry_run:
+        dict_names = {
+            "qvariant_type": fix_qvariant_type,
+            "fix_pyqt_import": fix_pyqt_import,
+            "enums": fix_qt_enums,
+            "rename_qt_enums": rename_qt_enums,
+            "member_renames": member_renames,
+            "function_def_renames": function_def_renames,
+            "custom_updates": custom_updates,
+            "extra_imports": extra_imports,
+            "removed_imports": removed_imports,
+            "token_renames": token_renames,
+        }
+
+        def transform_offset(text):
+            match = re.search(r"Offset\(line=(\d+), utf8_byte_offset=(\d+)\)", text)
+            if match:
+                line, col = match.groups()
+                return f"|row:{line}|col:{col}|"
+            return ""
+
+        for dict_name, data_dict in dict_names.items():
+            if data_dict:
+                if isinstance(data_dict, dict):
+                    for key, value in data_dict.items():
+                        if dict_name == "enums":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"Enum error, add {} before {}".format(value[1], value[2])}"
+                            )
+
+                        elif dict_name == "removed_imports":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"Remove import {}".format(str(value))}"
+                            )
+
+                        elif dict_name == "extra_imports":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"Extra import {}".format(str(value))}"
+                            )
+                        elif dict_name == "member_renames":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"This members should be renamed to {}".format(str(value))}"
+                            )
+                        elif dict_name == "function_def_renames":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"This function should be renamed to {}".format(str(value))}"
+                            )
+                        elif dict_name == "token_renames":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"Token renames {}".format(str(value))}"
+                            )
+                        elif dict_name == "custom_updates":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(key))}{"Custom updates {}".format(str(value))}"
+                            )
+
+                elif isinstance(data_dict, list):
+                    for elem in data_dict:
+                        if dict_name == "qvariant_type":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(elem))}{"QVariant error"}"
+                            )
+
+                        elif dict_name == "fix_pyqt_import":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(elem))}{"Fix PyQT import, you must import from qgis.PyQt"}"
+                            )
+
+                        elif dict_name == "rename_qt_enums":
+                            logging.warning(
+                                f"{file_basename}:{transform_offset(str(elem))}{"This enum was renamed"}"
+                            )
+        return 0
 
     if not any(
         [
@@ -700,6 +799,8 @@ def fix_file(filename: str, qgis3_compat: bool) -> int:
             tokens[i + 2] = tokens[i + 2]._replace(src=f"{enum_name[0]}.{enum_name[1]}")
 
     new_contents = tokens_to_src(tokens)
+
+    # Files can only be modified if dry_run mode is not activated.
     with open(filename, "w") as f:
         f.write(new_contents)
 
@@ -775,6 +876,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Apply modifications that would break behavior on QGIS 3, hence code may not work on QGIS 3",
     )
+    parser.add_argument(
+        "--dry_run",
+        action="store_true",
+        help="Displays the changes that would be made, but does not modify any files.",
+    )
     args = parser.parse_args(argv)
 
     # get all scope for all qt enum
@@ -783,12 +889,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             get_class_enums(value)
 
     ret = 0
+
+    dry_run = args.dry_run if args.dry_run else False
+
+    if dry_run:
+        logging.info("=== dry_run mode | Start Logs ===")
+
     for filename in glob.glob(os.path.join(args.directory, "**/*.py"), recursive=True):
-        # print(f'Processing {filename}')
         if "auto_additions" in filename:
             continue
 
-        ret |= fix_file(filename, not args.qgis3_incompatible_changes)
+        ret |= fix_file(filename, not args.qgis3_incompatible_changes, dry_run)
     return ret
 
 
