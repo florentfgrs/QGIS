@@ -421,6 +421,49 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                     "safely require Qt >= 5.14. Otherwise conditional Qt version code will need to be introduced.\n"
                 )
 
+    def logging_run_dry():
+        for key, value in fix_qt_enums.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Enum error, add {value[1]} before {value[2]}"
+            )
+
+        for key, value in member_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This member should be renamed to {value}"
+            )
+
+        for key, value in function_def_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This function should be renamed to {value}"
+            )
+
+        for key, value in token_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Token rename {value}"
+            )
+
+        for key, value in custom_updates.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update {value}"
+            )
+
+        for elem in fix_qvariant_type:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - QVariant error"
+            )
+
+        for elem in fix_pyqt_import:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - Fix PyQT import, you must import from qgis.PyQt"
+            )
+
+        for elem in rename_qt_enums:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - This enum was renamed"
+            )
+
+        return 0
+
     def visit_import(_node: ast.ImportFrom, _parent):
         import_offsets[Offset(node.lineno, node.col_offset)] = (
             node.module,
@@ -541,66 +584,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             )
 
     if dry_run:
-        dict_names = {
-            "qvariant_type": fix_qvariant_type,
-            "fix_pyqt_import": fix_pyqt_import,
-            "enums": fix_qt_enums,
-            "rename_qt_enums": rename_qt_enums,
-            "member_renames": member_renames,
-            "function_def_renames": function_def_renames,
-            "custom_updates": custom_updates,
-            "token_renames": token_renames,
-        }
-
-        def transform_offset(text):
-            match = re.search(r"Offset\(line=(\d+), utf8_byte_offset=(\d+)\)", text)
-            if match:
-                line, col = match.groups()
-                return f":{line}:{col} - "
-            return ""
-
-        for dict_name, data_dict in dict_names.items():
-            if data_dict:
-                if isinstance(data_dict, dict):
-                    for key, value in data_dict.items():
-                        if dict_name == "enums":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(key))}{"Enum error, add {} before {}".format(value[1], value[2])}"
-                            )
-                        elif dict_name == "member_renames":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(key))}{"This members should be renamed to {}".format(str(value))}"
-                            )
-                        elif dict_name == "function_def_renames":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(key))}{"This function should be renamed to {}".format(str(value))}"
-                            )
-                        elif dict_name == "token_renames":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(key))}{"Token renames {}".format(str(value))}"
-                            )
-                        elif dict_name == "custom_updates":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(key))}{"Custom updates {}".format(str(value))}"
-                            )
-
-                elif isinstance(data_dict, list):
-                    for elem in data_dict:
-                        if dict_name == "qvariant_type":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(elem))}{"QVariant error"}"
-                            )
-
-                        elif dict_name == "fix_pyqt_import":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(elem))}{"Fix PyQT import, you must import from qgis.PyQt"}"
-                            )
-
-                        elif dict_name == "rename_qt_enums":
-                            logging.warning(
-                                f"{filename}{transform_offset(str(elem))}{"This enum was renamed"}"
-                            )
-        return 0
+        logging_run_dry()
 
     if not any(
         [
