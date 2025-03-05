@@ -542,27 +542,27 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
     if dry_run:
         for key, value in fix_qt_enums.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Enum error, add {value[1]} before {value[2]}"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Enum error, add '{value[1]}' before '{value[2]}'"
             )
 
         for key, value in member_renames.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - This member should be renamed to {value}"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This member should be renamed to '{value}'"
             )
 
         for key, value in function_def_renames.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - This function should be renamed to {value}"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This function should be renamed to '{value}'"
             )
 
         for key, value in token_renames.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Use {value} instead"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Use '{value}' instead"
             )
 
         for key, value in custom_updates.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update {value}"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update '{value}'"
             )
 
         for elem in fix_qvariant_type:
