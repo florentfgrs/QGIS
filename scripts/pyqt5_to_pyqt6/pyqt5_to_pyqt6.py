@@ -567,7 +567,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
         for elem in fix_qvariant_type:
             logging.warning(
-                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - QVariant error"
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - Replace QVariant.X with QMetaType.Type.X"
             )
 
         for elem in fix_pyqt_import:
