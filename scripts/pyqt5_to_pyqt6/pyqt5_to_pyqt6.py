@@ -214,9 +214,6 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
     int
         Return 0 if no file is modified.
     """
-
-    file_basename = os.path.basename(filename)
-
     with open(filename, encoding="UTF-8") as f:
         contents = f.read()
 
@@ -434,7 +431,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
         imported_modules.add(node.module)
         for name in node.names:
             if name.name in import_warnings:
-                logging.warning(f"{file_basename}: {import_warnings[name.name]}")
+                logging.warning(f"{filename}: {import_warnings[name.name]}")
             if name.name == "resources_rc":
                 sys.stderr.write(
                     f"{filename}:{_node.lineno}:{_node.col_offset} WARNING: support for compiled resources "
@@ -540,7 +537,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             class_import = ", ".join(classes)
             import_statement = f"from {module} import {class_import}"
             logging.warning(
-                f"{file_basename}: Missing import, manually add {import_statement}"
+                f"{filename}: Missing import, manually add {import_statement}"
             )
 
     if dry_run:
@@ -552,8 +549,6 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             "member_renames": member_renames,
             "function_def_renames": function_def_renames,
             "custom_updates": custom_updates,
-            "extra_imports": extra_imports,
-            "removed_imports": removed_imports,
             "token_renames": token_renames,
         }
 
@@ -561,7 +556,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             match = re.search(r"Offset\(line=(\d+), utf8_byte_offset=(\d+)\)", text)
             if match:
                 line, col = match.groups()
-                return f"|row:{line}|col:{col}|"
+                return f":{line}:{col} - "
             return ""
 
         for dict_name, data_dict in dict_names.items():
@@ -570,50 +565,40 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                     for key, value in data_dict.items():
                         if dict_name == "enums":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"Enum error, add {} before {}".format(value[1], value[2])}"
-                            )
-
-                        elif dict_name == "removed_imports":
-                            logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"Remove import {}".format(str(value))}"
-                            )
-
-                        elif dict_name == "extra_imports":
-                            logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"Extra import {}".format(str(value))}"
+                                f"{filename}{transform_offset(str(key))}{"Enum error, add {} before {}".format(value[1], value[2])}"
                             )
                         elif dict_name == "member_renames":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"This members should be renamed to {}".format(str(value))}"
+                                f"{filename}{transform_offset(str(key))}{"This members should be renamed to {}".format(str(value))}"
                             )
                         elif dict_name == "function_def_renames":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"This function should be renamed to {}".format(str(value))}"
+                                f"{filename}{transform_offset(str(key))}{"This function should be renamed to {}".format(str(value))}"
                             )
                         elif dict_name == "token_renames":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"Token renames {}".format(str(value))}"
+                                f"{filename}{transform_offset(str(key))}{"Token renames {}".format(str(value))}"
                             )
                         elif dict_name == "custom_updates":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(key))}{"Custom updates {}".format(str(value))}"
+                                f"{filename}{transform_offset(str(key))}{"Custom updates {}".format(str(value))}"
                             )
 
                 elif isinstance(data_dict, list):
                     for elem in data_dict:
                         if dict_name == "qvariant_type":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(elem))}{"QVariant error"}"
+                                f"{filename}{transform_offset(str(elem))}{"QVariant error"}"
                             )
 
                         elif dict_name == "fix_pyqt_import":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(elem))}{"Fix PyQT import, you must import from qgis.PyQt"}"
+                                f"{filename}{transform_offset(str(elem))}{"Fix PyQT import, you must import from qgis.PyQt"}"
                             )
 
                         elif dict_name == "rename_qt_enums":
                             logging.warning(
-                                f"{file_basename}:{transform_offset(str(elem))}{"This enum was renamed"}"
+                                f"{filename}{transform_offset(str(elem))}{"This enum was renamed"}"
                             )
         return 0
 
