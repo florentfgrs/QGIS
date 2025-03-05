@@ -557,7 +557,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
         for key, value in token_renames.items():
             logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Token rename {value}"
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Use {value} instead"
             )
 
         for key, value in custom_updates.items():
