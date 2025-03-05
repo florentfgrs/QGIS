@@ -848,8 +848,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--logfile",
-        action="store_true",
-        help="Enable logging to a pyqt5_to_pyqt6.log file",
+        action="store",
+        help="Path to logging file",
     )
 
     args = parser.parse_args(argv)
@@ -859,7 +859,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         logging.basicConfig(
             level=logging.DEBUG,
             format=log_format,
-            filename=Path(args.directory) / "pyqt5_to_pyqt6.log",
+            filename=Path(args.logfile),
             filemode="w",
         )
 
