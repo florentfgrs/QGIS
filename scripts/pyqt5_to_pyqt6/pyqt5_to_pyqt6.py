@@ -47,12 +47,11 @@ import os
 import sys
 import logging
 import re
+from pathlib import Path
 
 from collections import defaultdict
 from collections.abc import Sequence
 from enum import Enum
-
-logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
 try:
     import PyQt5
@@ -421,49 +420,6 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                     "safely require Qt >= 5.14. Otherwise conditional Qt version code will need to be introduced.\n"
                 )
 
-    def logging_run_dry():
-        for key, value in fix_qt_enums.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Enum error, add {value[1]} before {value[2]}"
-            )
-
-        for key, value in member_renames.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - This member should be renamed to {value}"
-            )
-
-        for key, value in function_def_renames.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - This function should be renamed to {value}"
-            )
-
-        for key, value in token_renames.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Token rename {value}"
-            )
-
-        for key, value in custom_updates.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update {value}"
-            )
-
-        for elem in fix_qvariant_type:
-            logging.warning(
-                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - QVariant error"
-            )
-
-        for elem in fix_pyqt_import:
-            logging.warning(
-                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - Fix PyQT import, you must import from qgis.PyQt"
-            )
-
-        for elem in rename_qt_enums:
-            logging.warning(
-                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - This enum was renamed"
-            )
-
-        return 0
-
     def visit_import(_node: ast.ImportFrom, _parent):
         import_offsets[Offset(node.lineno, node.col_offset)] = (
             node.module,
@@ -476,8 +432,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             if name.name in import_warnings:
                 logging.warning(f"{filename}: {import_warnings[name.name]}")
             if name.name == "resources_rc":
-                sys.stderr.write(
-                    f"{filename}:{_node.lineno}:{_node.col_offset} WARNING: support for compiled resources "
+                logging.warning(
+                    f"{filename}:{_node.lineno}:{_node.col_offset} - WARNING: support for compiled resources "
                     "is removed in Qt6. Directly load icon resources by file path and load UI fields using "
                     "uic.loadUiType by file path instead.\n"
                 )
@@ -584,7 +540,47 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             )
 
     if dry_run:
-        logging_run_dry()
+        for key, value in fix_qt_enums.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Enum error, add {value[1]} before {value[2]}"
+            )
+
+        for key, value in member_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This member should be renamed to {value}"
+            )
+
+        for key, value in function_def_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - This function should be renamed to {value}"
+            )
+
+        for key, value in token_renames.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Token rename {value}"
+            )
+
+        for key, value in custom_updates.items():
+            logging.warning(
+                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update {value}"
+            )
+
+        for elem in fix_qvariant_type:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - QVariant error"
+            )
+
+        for elem in fix_pyqt_import:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - Fix PyQT import, you must import from qgis.PyQt"
+            )
+
+        for elem in rename_qt_enums:
+            logging.warning(
+                f"{filename}:{elem.line}:{elem.utf8_byte_offset} - This enum was renamed"
+            )
+
+        return 0
 
     if not any(
         [
@@ -850,7 +846,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Displays the changes that would be made, but does not modify any files.",
     )
+    parser.add_argument(
+        "--logfile",
+        action="store_true",
+        help="Enable logging to a pyqt5_to_pyqt6.log file",
+    )
+
     args = parser.parse_args(argv)
+    log_format = "%(message)s"
+
+    if args.logfile:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format=log_format,
+            filename=Path(args.directory) / "pyqt5_to_pyqt6.log",
+            filemode="w",
+        )
+
+    else:
+        logging.basicConfig(level=logging.DEBUG, format=log_format)
 
     # get all scope for all qt enum
     for module in target_modules:
