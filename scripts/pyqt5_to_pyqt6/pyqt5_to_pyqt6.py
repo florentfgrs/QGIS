@@ -275,7 +275,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
                     _invalid_qvariant_to_null,
-                    "invalid_qvariant_to_null",
+                    "Invalid conversion of QVariant(QVariant.Null). Use from qgis.core import NULL instead",
                 )
             elif (
                 len(_node.args) == 1
@@ -298,7 +298,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
                     _fix_null_qvariant,
-                    "fix_qvariant_to_null",
+                    "Invalid conversion of QVariant() to NULL. Use from qgis.core import NULL instead",
                 )
         elif isinstance(_node.func, ast.Name) and _node.func.id == "QDateTime":
             if len(_node.args) == 8:
@@ -332,7 +332,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
                     _fix_qdatetime_construct,
-                    "_fix_qdatetime_construct",
+                    "QDateTime(yyyy, mm, dd, hh, MM, ss, ms, ts) doesn't work anymore, so port to more reliable QDateTime(QDate, QTime, ts) form",
                 )
             elif (
                 len(_node.args) == 1
@@ -359,7 +359,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
                     _fix_qdatetime_construct,
-                    "_fix_qdatetime_construct2",
+                    "QDateTime(QDate(..)) doesn't work anymore, so port to more reliable QDateTime(QDate(...), QTime(0,0,0)) form",
                 )
 
     def visit_attribute(_node: ast.Attribute, _parent):
@@ -566,26 +566,7 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
 
         for key, value in custom_updates.items():
             _, text = value
-
-            if text == "fix_qvariant_to_null":
-                logging.warning(
-                    f"{filename}:{key.line}:{key.utf8_byte_offset} - Invalid conversion of QVariant() to NULL. Use from qgis.core import NULL instead."
-                )
-
-            if text == "invalid_qvariant_to_null":
-                logging.warning(
-                    f"{filename}:{key.line}:{key.utf8_byte_offset} - Invalid conversion of QVariant(QVariant.Null). Use from qgis.core import NULL instead."
-                )
-
-            if text == "_fix_qdatetime_construct":
-                logging.warning(
-                    f"{filename}:{key.line}:{key.utf8_byte_offset} - QDateTime(yyyy, mm, dd, hh, MM, ss, ms, ts) doesn't work anymore, so port to more reliable QDateTime(QDate, QTime, ts) form"
-                )
-
-            if text == "_fix_qdatetime_construct2":
-                logging.warning(
-                    f"{filename}:{key.line}:{key.utf8_byte_offset} - QDateTime(QDate(..)) doesn't work anymore, so port to more reliable QDateTime(QDate(...), QTime(0,0,0)) form"
-                )
+            logging.warning(f"{filename}:{key.line}:{key.utf8_byte_offset} - {text}")
 
         for elem in fix_qvariant_type:
             logging.warning(
