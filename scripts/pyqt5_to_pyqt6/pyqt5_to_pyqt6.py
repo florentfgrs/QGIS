@@ -274,7 +274,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                         tokens[i] = tokens[i]._replace(src="")
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
-                    _invalid_qvariant_to_null
+                    _invalid_qvariant_to_null,
+                    "invalid_qvariant_to_null",
                 )
             elif (
                 len(_node.args) == 1
@@ -296,7 +297,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                         tokens[i] = tokens[i]._replace(src="")
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
-                    _fix_null_qvariant
+                    _fix_null_qvariant,
+                    "fix_qvariant_to_null",
                 )
         elif isinstance(_node.func, ast.Name) and _node.func.id == "QDateTime":
             if len(_node.args) == 8:
@@ -329,7 +331,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                     tokens[i] = tokens[i]._replace(src="),")
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
-                    _fix_qdatetime_construct
+                    _fix_qdatetime_construct,
+                    "_fix_qdatetime_construct",
                 )
             elif (
                 len(_node.args) == 1
@@ -355,7 +358,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                     tokens[i - 1] = tokens[i - 1]._replace(src="), QTime(0, 0, 0)")
 
                 custom_updates[Offset(_node.lineno, _node.col_offset)] = (
-                    _fix_qdatetime_construct
+                    _fix_qdatetime_construct,
+                    "_fix_qdatetime_construct2",
                 )
 
     def visit_attribute(_node: ast.Attribute, _parent):
@@ -561,9 +565,27 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
             )
 
         for key, value in custom_updates.items():
-            logging.warning(
-                f"{filename}:{key.line}:{key.utf8_byte_offset} - Custom update '{value}'"
-            )
+            _, text = value
+
+            if text == "fix_qvariant_to_null":
+                logging.warning(
+                    f"{filename}:{key.line}:{key.utf8_byte_offset} - Invalid conversion of QVariant() to NULL. Use from qgis.core import NULL instead."
+                )
+
+            if text == "invalid_qvariant_to_null":
+                logging.warning(
+                    f"{filename}:{key.line}:{key.utf8_byte_offset} - Invalid conversion of QVariant(QVariant.Null). Use from qgis.core import NULL instead."
+                )
+
+            if text == "_fix_qdatetime_construct":
+                logging.warning(
+                    f"{filename}:{key.line}:{key.utf8_byte_offset} - QDateTime(yyyy, mm, dd, hh, MM, ss, ms, ts) doesn't work anymore, so port to more reliable QDateTime(QDate, QTime, ts) form"
+                )
+
+            if text == "_fix_qdatetime_construct2":
+                logging.warning(
+                    f"{filename}:{key.line}:{key.utf8_byte_offset} - QDateTime(QDate(..)) doesn't work anymore, so port to more reliable QDateTime(QDate(...), QTime(0,0,0)) form"
+                )
 
         for elem in fix_qvariant_type:
             logging.warning(
@@ -700,7 +722,8 @@ def fix_file(filename: str, qgis3_compat: bool, dry_run: bool = False) -> int:
                 tokens[i + 2] = tokens[i + 2]._replace(src=qmetatype_mapping[attr])
 
         if token.offset in custom_updates:
-            custom_updates[token.offset](i, tokens)
+            method, _ = custom_updates[token.offset]
+            method(i, tokens)
 
         if token.offset in fix_pyqt_import:
             assert tokens[i + 2].src == "PyQt5"
