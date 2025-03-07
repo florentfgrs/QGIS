@@ -875,9 +875,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     ret = 0
 
-    dry_run = args.dry_run if args.dry_run else False
-
-    if dry_run:
+    if args.dry_run:
         logging.info("=== dry_run mode | Start Logs ===")
 
     for filename in glob.glob(os.path.join(args.directory, "**/*.py"), recursive=True):
